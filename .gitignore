@@ -1,8 +1,6 @@
 __pycache__
-*.pth
-ddpm*.png
-.env
 
+samples/
 checkpoints/
 AxonalRingsDataset/
 cifar-10-batches-py/
