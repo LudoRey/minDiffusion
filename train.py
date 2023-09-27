@@ -16,30 +16,24 @@ import time
 import os
 import argparse
 
-# idea of parameters for general train.py : dataset name 
-def train_cifar10(n_epoch = 100, load_checkpoint = None):
+from data.axons_dataset import AxonsDataset
+
+# idea of parameters for general train.py : dataset name, batch size
+def train(dataset_name, n_epoch=100, batch_size=512, load_checkpoint=None):
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     date_time_string = time.strftime("%Y%m%d_%H%M", time.localtime()) 
     
     # Create Dataset and DataLoader
-    tf = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
-    )
-    dataset = CIFAR10(
-        "./data",
-        train=True,
-        download=True,
-        transform=tf,
-    )
-    dataloader = DataLoader(dataset, batch_size=512, shuffle=True)
+    dataset = globals()[dataset_name](root="./data")
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Initialize model
-    ddpm = DDPM(eps_model=NaiveUnet(3, 3, n_feat=128), betas=(1e-4, 0.02), n_T=1000)
+    ddpm = DDPM(eps_model=NaiveUnet(1, 1, n_feat=128), betas=(1e-4, 0.02), n_T=1000)
     # Create checkpoint directory (or use previous one)
     if load_checkpoint is None:
         start_epoch = 0
-        checkpoint_dir = "./checkpoints/CIFAR10_"+date_time_string
+        checkpoint_dir = "./checkpoints/"+dataset_name+"_"+date_time_string
         if not os.path.exists(checkpoint_dir):
             os.mkdir(checkpoint_dir)
     else:
@@ -66,8 +60,9 @@ def train_cifar10(n_epoch = 100, load_checkpoint = None):
 
         pbar = tqdm(dataloader)
         loss_ema = None
-        for x, _ in pbar:
+        for batch in pbar:
             optim.zero_grad()
+            x = batch['STED']
             x = x.to(device)
             loss = ddpm(x)
             loss.backward()
@@ -81,8 +76,8 @@ def train_cifar10(n_epoch = 100, load_checkpoint = None):
         if i % 10 == 0 or i == n_epoch:
             ddpm.eval()
             with torch.no_grad():
-                xh = ddpm.sample(8, (3, 32, 32), device)
-                xset = torch.cat([xh, x[:8]], dim=0)
+                xh = ddpm.sample(4, (1, 32, 32), device)
+                xset = torch.cat([xh, x[:4]], dim=0)
                 grid = make_grid(xset, normalize=True, value_range=(-1, 1), nrow=4)
                 # save grid image and model
                 save_image(grid, checkpoint_dir + f"/sample_{i}.png")
@@ -91,8 +86,10 @@ def train_cifar10(n_epoch = 100, load_checkpoint = None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset_name", type=str)
     parser.add_argument("--n_epoch", type=int, default=100, help="The training run stops after the epoch count reaches n_epoch")
+    parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--load_checkpoint", default=None, help="The path to a .pth file which is used to initialize the model")
     args = parser.parse_args()
 
-    train_cifar10(n_epoch=args.n_epoch, load_checkpoint=args.load_checkpoint)
+    train(dataset_name=args.dataset_name, n_epoch=args.n_epoch, batch_size=args.batch_size, load_checkpoint=args.load_checkpoint)
