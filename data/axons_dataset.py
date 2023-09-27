@@ -12,13 +12,14 @@ class AxonsDataset(Dataset):
 
     """
 
-    def __init__(self, root="./data", phase="train", transform=None):
+    def __init__(self, root="./data", phase="train", normalize=True, crop=True):
         """Initialize this dataset class.
 
         """
         self.dir_images = os.path.join(root, "AxonalRingsDataset", phase)  # get the image directory
         self.image_paths = sorted(make_dataset(self.dir_images))  # get image paths
-        self.transform = transform # tf to be applied 
+        self.normalize = normalize
+        self.crop = crop
 
     def __getitem__(self, index):
         """Return a data point and its metadata information.
@@ -33,17 +34,21 @@ class AxonsDataset(Dataset):
         """
         # read a image given a random integer index
         image_path = self.image_paths[index]
+        image = tifffile.imread(image_path)[0:2].astype(float) / 255.0
+        image = torch.Tensor(image)
 
-        image = tifffile.imread(image_path).astype(float) / 255.0
+        # preprocessing
+        if self.normalize:
+            tf = transforms.Normalize(0.04, 0.1)
+            image = tf(image)
+        if self.crop:
+            tf = transforms.RandomCrop(64)
+            image = tf(image)
+
         # split image into confocal and STED
-        confocal = torch.Tensor(image[0]).unsqueeze(0)
-        STED = torch.Tensor(image[1]).unsqueeze(0)
-        if self.transform is None:
-            tf = transforms.Compose(
-                [transforms.Normalize(0.5, 0.5), transforms.RandomCrop(32)]
-            )
-            confocal = tf(confocal)
-            STED = tf(STED)
+        confocal = image[0].unsqueeze(0)
+        STED = image[1].unsqueeze(0)
+
         return {'confocal': confocal, 'STED': STED}
 
 
