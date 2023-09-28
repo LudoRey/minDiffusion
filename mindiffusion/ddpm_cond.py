@@ -42,8 +42,9 @@ class cDDPM(nn.Module):
 
         return self.criterion(eps, self.eps_model(torch.cat((x_t, x_cond), 1), _ts / self.n_T))
 
-    def sample(self, x_cond: torch.Tensor, n_sample: int, size, device) -> torch.Tensor:
-
+    def sample(self, x_cond: torch.Tensor, device) -> torch.Tensor:
+        n_sample = x_cond.shape[0]
+        size = x_cond.shape[1:]
         x_i = torch.randn(n_sample, *size).to(device)  # x_T ~ N(0, 1)
 
         # This samples accordingly to Algorithm 2. It is exactly the same logic.
