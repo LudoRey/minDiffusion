@@ -18,18 +18,18 @@ import argparse
 
 from data.axons_dataset import AxonsDataset
 
-# idea of parameters for general train.py : dataset name, batch size
-def train(dataset_name, n_epoch=100, batch_size=512, load_checkpoint=None):
+def train(dataset_name, n_epoch=100, batch_size=64, load_checkpoint=None):
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     date_time_string = time.strftime("%Y%m%d_%H%M", time.localtime()) 
     
     # Create Dataset and DataLoader
-    dataset = globals()[dataset_name](root="./data")
+    dataset = globals()[dataset_name](root="./data", crop=False)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    img_shape = dataset[0]["STED"].shape
 
     # Initialize model
-    ddpm = DDPM(eps_model=NaiveUnet(1, 1, n_feat=128), betas=(1e-4, 0.02), n_T=1000)
+    ddpm = DDPM(eps_model=NaiveUnet(img_shape[0], img_shape[0], n_feat=128), betas=(1e-4, 0.02), n_T=1000)
     # Create checkpoint directory (or use previous one)
     if load_checkpoint is None:
         start_epoch = 0
@@ -73,12 +73,12 @@ def train(dataset_name, n_epoch=100, batch_size=512, load_checkpoint=None):
             pbar.set_description(f"loss: {loss_ema:.4f}")
             optim.step()
 
-        if i % 10 == 0 or i == n_epoch:
+        if i % 10 == 0:
             ddpm.eval()
             with torch.no_grad():
-                xh = ddpm.sample(4, (1, 32, 32), device)
+                xh = ddpm.sample(4, img_shape, device)
                 xset = torch.cat([xh, x[:4]], dim=0)
-                grid = make_grid(xset, normalize=True, value_range=(-1, 1), nrow=4)
+                grid = make_grid(xset, normalize=True, value_range=(-0.4, 1), nrow=4)
                 # save grid image and model
                 save_image(grid, checkpoint_dir + f"/sample_{i}.png")
                 torch.save(ddpm.state_dict(), checkpoint_dir + f"/net_{i}.pth")
@@ -88,8 +88,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_name", type=str)
     parser.add_argument("--n_epoch", type=int, default=100, help="The training run stops after the epoch count reaches n_epoch")
-    parser.add_argument("--batch_size", type=int, default=512)
-    parser.add_argument("--load_checkpoint", default=None, help="The path to a .pth file which is used to initialize the model")
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--load_checkpoint", type=str, default=None, help="The path to a .pth file which is used to initialize the model")
     args = parser.parse_args()
 
     train(dataset_name=args.dataset_name, n_epoch=args.n_epoch, batch_size=args.batch_size, load_checkpoint=args.load_checkpoint)
