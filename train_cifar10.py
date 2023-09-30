@@ -9,8 +9,8 @@ from torchvision.datasets import CIFAR10
 from torchvision import transforms
 from torchvision.utils import save_image, make_grid
 
-from mindiffusion.unet import NaiveUnet
-from mindiffusion.ddpm import DDPM
+from models.unet import NaiveUnet
+from models.ddpm import DDPM
 
 import time
 import os

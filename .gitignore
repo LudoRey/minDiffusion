@@ -1,6 +1,5 @@
 __pycache__
 
-samples/
+data/
 checkpoints/
-AxonalRingsDataset/
-cifar-10-batches-py/
+samples/

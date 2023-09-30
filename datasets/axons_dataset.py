@@ -1,6 +1,6 @@
 import os.path
 from torch.utils.data import Dataset
-from data.image_folder import make_dataset
+from datasets.image_folder import make_dataset
 from torchvision import transforms
 from PIL import Image
 import numpy as np
