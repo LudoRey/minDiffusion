@@ -1,6 +1,9 @@
 import os
 import csv
 import time
+import torch
+#import cv2
+from matplotlib import cm
 
 def get_checkpoint_dir(opt):
     # Create checkpoint directory if no checkpoint is loaded
@@ -32,5 +35,31 @@ def save_loss(logged_loss, file_path):
     with open(file_path, mode="a", newline='') as file:
         writer = csv.DictWriter(file, fieldnames=['Epoch', 'Loss'])
         writer.writerows(logged_loss)
+
+def apply_colormap(x, vmin=0, vmax=1, cmap=cm.get_cmap('hot')):
+    '''Input: a Bx1xHxW tensor. Output: a Bx3xHxW tensor.'''
+    x = torch.clamp(x, vmin, vmax)
+    x = (x-vmin)/(vmax-vmin)
+    y = cmap(x.squeeze(1).cpu().numpy())
+    y = torch.Tensor(y).permute(0,3,1,2) # BxHxWxC -> BxCxHxW
+    return y
     
-       
+def write_video(output_path, frames, fps):
+    # Define the codec and its settings
+    fourcc = cv2.VideoWriter_fourcc(*'FFV1') 
+    frame_width, frame_height = frames.shape[2], frames.shape[1]  # Frame dimensions
+
+    # Set a higher bitrate for better quality (adjust as needed)
+    bitrate = 80000  # 80000 kbps (80 Mbps)
+
+    out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height), isColor=True)
+    out.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'FFV1'))
+    out.set(cv2.CAP_PROP_BITRATE, bitrate * 1000)  # Convert kbps to bps
+
+    # Write frames to the video file
+    for i in range(frames.shape[0]):
+        frame = cv2.cvtColor(frames[i], cv2.COLOR_RGB2BGR)  # Convert to BGR format
+        out.write(frame)
+
+    # Release the video writer
+    out.release()
