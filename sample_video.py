@@ -6,12 +6,11 @@ from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
 
 from models.unet import Unet
-from models.ddpm_cond import cDDPM
+from models.cddm import *
 
 from datasets.axons_dataset import AxonsDataset
 from datasets.dendrites_dataset import DendritesDataset
 from misc.options import parse_options
-
 from misc.utils import apply_colormap
 
 def sample(opt, n_samples=1):
@@ -39,10 +38,11 @@ def sample(opt, n_samples=1):
 
     # Concatenate along width axis
     frames = torch.cat([trajectory, estimates], dim=3)
+    #frames = trajectory
     # Only save one of every 10 intermediate results
     frames = frames[::10]
     # Convert to color images
-    frames = apply_colormap(frames, vmin=-0.8, vmax=1)
+    frames = apply_colormap(frames, vmin=-0.8, vmax=7)
     # Convert back to uint8
     frames = (frames*255).type(torch.uint8)
     # Convert to TxHxWxC format

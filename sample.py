@@ -6,8 +6,7 @@ from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
 
 from models.unet import Unet
-from models.ddpm_cond import cDDPM
-from models.ddim_cond import cDDIM
+from models.cddm import *
 
 from datasets.axons_dataset import AxonsDataset
 from datasets.dendrites_dataset import DendritesDataset
@@ -27,21 +26,24 @@ def sample(opt, n_samples=4):
 
     img_shape = dataset[0]["STED"].shape
     # Load model
-    ddpm = cDDPM(eps_model=Unet(img_shape[0]*2, img_shape[0], n_feat=128), betas=(1e-4, 0.02), n_T=1000)
+    model = cDDIM(eps_model=Unet(img_shape[0]*2, img_shape[0], n_feat=128), betas=(1e-4, 0.02), n_T=1000)
 
     checkpoint_dir = os.path.join("./checkpoints", opt.load_checkpoint)
-    ddpm.load_state_dict(torch.load(os.path.join(checkpoint_dir, "net_"+str(opt.load_epoch)+".pth")))
-    ddpm.to(device)
+    state_dict = torch.load(os.path.join(checkpoint_dir, "net_"+str(opt.load_epoch)+".pth"))
+    state_dict = {key: value for key, value in state_dict.items() if key.startswith('eps_model')} # register_buffer used to be persistent 
+    model.load_state_dict(state_dict, strict=False)
+    model.to(device)
 
-    ddpm.eval()
+    tau = get_tau(dim=100)
+
+    model.eval()
     with torch.no_grad():
-        # Sample test
-        samples = ddpm.sample(test_confocal, device)
+        samples = model.sample(test_confocal, tau)
     
     # Make and save grid
     xset = torch.cat((test_confocal, samples, test_STED), dim=0)
-    yset = apply_colormap(xset, vmin=-0.8, vmax=1)
-    grid = make_grid(yset, nrow=4)
+    yset = apply_colormap(xset, vmin=-0.8, vmax=7)
+    grid = make_grid(yset, nrow=n_samples)
     save_image(grid, "samples/sample_"+opt.load_checkpoint+"_"+str(opt.load_epoch)+".png")
     
 if __name__ == "__main__":
