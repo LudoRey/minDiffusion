@@ -12,7 +12,7 @@ class DendritesDataset(Dataset):
 
     """
 
-    def __init__(self, root="./data", phase="train", normalize=True, crop=True):
+    def __init__(self, root="./data", phase="train", normalize=True, crop=False):
         """Initialize this dataset class.
 
         """
@@ -39,8 +39,8 @@ class DendritesDataset(Dataset):
 
         # preprocessing
         if self.normalize:
-            tf = transforms.Normalize(0.2, 0.25)
-            image[0:2] = tf(image[0:2])
+            image[0:1] = transforms.Normalize(0.08, 0.11)(image[0:1])
+            image[1:2] = transforms.Normalize(0.03, 0.04)(image[1:2])
         if self.crop:
             tf = transforms.RandomCrop(64)
             image = tf(image)
