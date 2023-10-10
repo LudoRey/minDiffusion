@@ -25,16 +25,17 @@ def write_training_info(opt, file_path):
             file.write(f"{key}: {value} \n")
         file.write("\n")
     
-def save_loss(logged_loss, file_path):
+def save_logger(logger, file_path):
+    fieldnames = list(logger[0].keys())
     # Create csv file to store loss if does not exist
     if not os.path.exists(file_path):
         with open(file_path, mode="a", newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=['Epoch', 'Loss'])
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
     # Append logged loss to file, reset logged_loss
     with open(file_path, mode="a", newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=['Epoch', 'Loss'])
-        writer.writerows(logged_loss)
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writerows(logger)
 
 def apply_colormap(x, vmin=0, vmax=1, cmap=cm.get_cmap('hot')):
     '''Input: a Bx1xHxW tensor. Output: a Bx3xHxW tensor.'''
