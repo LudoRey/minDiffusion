@@ -29,7 +29,7 @@ class cDDM(nn.Module):
         t = torch.randint(1, self.n_T + 1, (x.shape[0],)).to(x.device)
         # Sample x_t from forward process through reparametrization
         eps = torch.randn_like(x)  # eps ~ N(0, 1)
-        x_t = self.sqrtab[t] * x + self.sqrtmab[t] * eps
+        x_t = self.sqrtab[t,None,None,None] * x + self.sqrtmab[t,None,None,None] * eps
         # Estimate eps using eps_model
         estimated_eps = self.eps_model(torch.cat((x_t, x_cond), 1), t / self.n_T)
 
@@ -47,8 +47,9 @@ class cDDPM(cDDM):
         n_sample = x_cond.shape[0]
         # Set generator and (optional) seed for reproducibility
         generator = torch.Generator(device)
-        if seed is not None:
-            generator.manual_seed(seed)
+        if seed is None:
+            seed = generator.seed() # get a random seed : default seed of generator is deterministic
+        generator.manual_seed(seed)
         # Storing intermediate results in case return_trajectory=True
         x = [] # vector containing all x_i's
         x_0_estimates = [] # vector containing all intermediate estimates of x0
@@ -62,7 +63,7 @@ class cDDPM(cDDM):
             x_0_i = (x_i - eps_i * self.sqrtmab[i])/self.sqrtab[i]
             # Compute next step of reverse process
             z = torch.randn(x_cond.shape, generator=generator, device=device) if i > 1 else 0
-            x_i = (self.oneover_sqrta[i] * (x_i - eps_i * self.beta_over_sqrtmab[i]) + self.sqrtbeta[i] * z) # sigma is sqrt_beta here
+            x_i = self.oneover_sqrta[i] * (x_i - eps_i * self.beta_over_sqrtmab[i]) + self.sqrtbeta[i] * z # sigma is sqrt_beta here
             # Store intermediate results
             x.append(x_i)
             x_0_estimates.append(x_0_i)
@@ -112,6 +113,44 @@ class cDDIM(cDDM):
             return torch.cat(x), torch.cat(x_0_estimates)
         else:
             return x_ti
+        
+class SR3(cDDM):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def sample(self, x_cond, return_trajectory=False, seed=None):
+        '''x_cond is a BxCxHxW tensor. Returns a tensor of the same shape.'''
+        # Get device and B (number of samples) from x_cond
+        device = x_cond.device
+        n_sample = x_cond.shape[0]
+        # Set generator and (optional) seed for reproducibility
+        generator = torch.Generator(device)
+        if seed is None:
+            seed = generator.seed() # get a random seed : default seed of generator is deterministic
+        generator.manual_seed(seed)
+        # Storing intermediate results in case return_trajectory=True
+        x = [] # vector containing all x_i's
+        x_0_estimates = [] # vector containing all intermediate estimates of x0
+
+        # DDPM sampling
+        x_i = torch.randn(x_cond.shape, generator=generator, device=device) # Initialize x_T with pure noise
+        for i in torch.arange(self.n_T, 0, -1):
+            # Compute estimate of eps
+            noise_level = self.sqrtab[i].to(device).repeat(n_sample, 1)
+            eps_i = self.eps_model(torch.cat((x_cond, x_i), 1), noise_level)
+            # Compute estimate of x_0 (useful only if return_trajectory is True)
+            x_0_i = (x_i - eps_i * self.sqrtmab[i])/self.sqrtab[i]
+            # Compute next step of reverse process
+            z = torch.randn(x_cond.shape, generator=generator, device=device) if i > 1 else 0
+            x_i = self.oneover_sqrta[i] * (x_i - eps_i * self.beta_over_sqrtmab[i]) + self.sqrtbeta[i] * z # sigma is sqrt_beta here
+            # Store intermediate results
+            x.append(x_i)
+            x_0_estimates.append(x_0_i)
+
+        if return_trajectory:
+            return torch.cat(x), torch.cat(x_0_estimates)
+        else:
+            return x_i
 
 
 def noise_schedules(beta1, betaT, T):
@@ -119,7 +158,7 @@ def noise_schedules(beta1, betaT, T):
     Returns pre-computed schedules. Uses DDPM paper notation
     '''
     assert beta1 < betaT < 1.0, "beta1 and betaT must be in (0, 1)"
-
+    # linear noise schedule
     beta = torch.linspace(beta1, betaT, T)
     beta = torch.cat([torch.zeros(1), beta]) # beta[0] is never accessed; but needed to make consistent indexing (beta[1] = beta1])
     sqrtbeta = torch.sqrt(beta)
