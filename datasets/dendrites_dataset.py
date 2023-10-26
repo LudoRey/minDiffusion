@@ -19,6 +19,8 @@ class DendritesDataset(Dataset):
         self.dir_images = os.path.join(root, "DendriticFActinDataset", phase)  # get the image directory
         self.image_paths = sorted(make_dataset(self.dir_images))  # get image paths
         self.normalize = normalize
+        self.coeffs_confocal = (0.085, 0.122) # (mean, std) for normalization
+        self.coeffs_sted = (0.085, 0.139) # ! computed after matching means
         self.crop = crop
 
     def __getitem__(self, index):
@@ -37,10 +39,14 @@ class DendritesDataset(Dataset):
         image = tifffile.imread(image_path).astype(float) / 255.0
         image = torch.Tensor(image)
 
+        # Match the mean of the STED image with the confocal image
+        ratio = torch.mean(image[0])/torch.mean(image[1])
+        image[1] = ratio*image[1]
         # preprocessing
         if self.normalize:
-            image[0:1] = transforms.Normalize(0.08, 0.11)(image[0:1])
-            image[1:2] = transforms.Normalize(0.03, 0.04)(image[1:2])
+            # Normalize to mean=0, std=1
+            image[0:1] = transforms.Normalize(*self.coeffs_confocal)(image[0:1])
+            image[1:2] = transforms.Normalize(*self.coeffs_sted)(image[1:2])
         if self.crop:
             tf = transforms.RandomCrop(64)
             image = tf(image)
@@ -48,12 +54,20 @@ class DendritesDataset(Dataset):
         # split image into confocal and STED
         confocal = image[0].unsqueeze(0)
         STED = image[1].unsqueeze(0)
-        seg_GTrings = image[2].unsqueeze(0)
-        seg_GTfibers = image[3].unsqueeze(0)
+        #seg_GTrings = image[2].unsqueeze(0)
+        #seg_GTfibers = image[3].unsqueeze(0)
 
-        return {'confocal': confocal, 'STED': STED, 'seg_GTrings': seg_GTrings, 'seg_GTfibers': seg_GTfibers}
+        return {'confocal': confocal, 'STED': STED}
+        #return {'confocal': confocal, 'STED': STED, 'seg_GTrings': seg_GTrings, 'seg_GTfibers': seg_GTfibers}
 
 
     def __len__(self):
         """Return the total number of images in the dataset."""
         return len(self.image_paths)
+    
+    def denormalize(self, images, type):
+        if type=='confocal':
+            images = images*self.coeffs_confocal[1] + self.coeffs_confocal[0]
+        if type=='STED': # STED images might be out out [0,1] range because of matching means
+            images = images*self.coeffs_sted[1] + self.coeffs_sted[0]
+        return images

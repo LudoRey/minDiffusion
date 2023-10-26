@@ -12,13 +12,15 @@ class AxonsDataset(Dataset):
 
     """
 
-    def __init__(self, root="./data", phase="train", normalize=True, crop=True):
+    def __init__(self, root="./data", phase="train", normalize=True, crop=False):
         """Initialize this dataset class.
 
         """
         self.dir_images = os.path.join(root, "AxonalRingsDataset", phase)  # get the image directory
         self.image_paths = sorted(make_dataset(self.dir_images))  # get image paths
         self.normalize = normalize
+        self.coeffs_confocal = (0.0341, 0.0628) # (mean, std) for normalization
+        self.coeffs_sted = (0.0341, 0.0679) # ! computed after matching means
         self.crop = crop
 
     def __getitem__(self, index):
@@ -34,13 +36,17 @@ class AxonsDataset(Dataset):
         """
         # read a image given a random integer index
         image_path = self.image_paths[index]
-        image = tifffile.imread(image_path)[0:2].astype(float) / 255.0
+        image = tifffile.imread(image_path).astype(float) / 255.0
         image = torch.Tensor(image)
 
+        # Match the mean of the STED image with the confocal image
+        ratio = torch.mean(image[0])/torch.mean(image[1])
+        image[1] = ratio*image[1]
         # preprocessing
         if self.normalize:
-            tf = transforms.Normalize(0.04, 0.1)
-            image = tf(image)
+            # Normalize to mean=0, std=1
+            image[0:1] = transforms.Normalize(*self.coeffs_confocal)(image[0:1])
+            image[1:2] = transforms.Normalize(*self.coeffs_sted)(image[1:2])
         if self.crop:
             tf = transforms.RandomCrop(64)
             image = tf(image)
@@ -51,7 +57,13 @@ class AxonsDataset(Dataset):
 
         return {'confocal': confocal, 'STED': STED}
 
-
     def __len__(self):
         """Return the total number of images in the dataset."""
         return len(self.image_paths)
+    
+    def denormalize(self, images, type):
+        if type=='confocal':
+            images = images*self.coeffs_confocal[1] + self.coeffs_confocal[0]
+        if type=='STED': # STED images might be out out [0,1] range because of matching means
+            images = images*self.coeffs_sted[1] + self.coeffs_sted[0]
+        return images
