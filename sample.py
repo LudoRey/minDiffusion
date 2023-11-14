@@ -82,7 +82,7 @@ def sample(opt, n_samples=4):
         batch_segSTED = task_net(batch_STED/factor)
 
     batch_seg = torch.cat((batch_segGT, batch_segSTED, batch_segDM))
-    batch_seg = combine_red_purple(batch_seg[:,1:2], batch_seg[:,0:1])
+    batch_seg = combine_purple_green(batch_seg[:,1:2], batch_seg[:,0:1])
     matrix_seg = torch.reshape(batch_seg, (n_samples,3,3,224,224))
 
     batch_images = torch.cat((batch_confocal, batch_STED, batch_DM)) 

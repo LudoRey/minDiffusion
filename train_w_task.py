@@ -132,7 +132,7 @@ def train(opt):
                 test_segSTED = model.task_net((test_STED-0.5)/0.5)*0.5 + 0.5
 
                 test_seg = torch.cat((test_segGT, test_segGen, test_segSTED)).cpu()
-                test_seg = combine_red_purple(test_seg[:,1:2], test_seg[:,0:1])
+                test_seg = combine_purple_green(test_seg[:,1:2], test_seg[:,0:1])
                 test_images = torch.cat((test_confocal, test_sample, test_STED)).cpu()
                 test_images = apply_colormap(test_images, vmin=0, vmax=1)
                 grid = make_grid(torch.cat((test_images, test_seg)), nrow=3)
