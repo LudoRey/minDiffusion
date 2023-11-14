@@ -8,10 +8,10 @@ class Logger():
     def __init__(self, opt):
         self.opt = opt
 
-        if opt.load_checkpoint is not None and opt.keep_dir:
-            self.checkpoint_dir = os.path.join("./checkpoints", opt.load_checkpoint)
-        else:
+        if opt.load_checkpoint is None or opt.change_dir:
             self.checkpoint_dir = self.make_checkpoint_dir()
+        else:
+            self.checkpoint_dir = os.path.join("./checkpoints", opt.load_checkpoint)
 
         self.log_buffer = pd.DataFrame()
         self.save_training_info()
