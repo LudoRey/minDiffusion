@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 
 class cDDM(nn.Module):
-    def __init__(self, denoising_net, denoising_target="eps", beta1=1e-4, betaT=0.02, T=1000, criterion=nn.MSELoss()):
+    def __init__(self, denoising_net, denoising_target="y", loss_weighting="uniform", beta1=1e-4, betaT=0.02, T=1000):
         '''
         General conditional denoising diffusion model. Sampling method needs to be defined in subclasses.
         '''
@@ -15,13 +15,16 @@ class cDDM(nn.Module):
             self.denoising_target = denoising_target
         else:
             raise ValueError(f"{denoising_target} is not a valid denoising target. Use either 'eps' or 'y'.")
+        if loss_weighting in ["uniform", "SNR"]:
+            self.loss_weighting = loss_weighting
+        else:
+            raise ValueError(f"{loss_weighting} is not a valid loss weighting strategy.")
 
         # register_buffer allows us to freely access these tensors by name
         for k, v in noise_schedules(beta1, betaT, T).items():
             self.register_buffer(k, v, persistent=False)
 
         self.T = T
-        self.criterion = criterion
 
     def forward_prediction(self, y, x, seed=None):
         '''
@@ -49,12 +52,24 @@ class cDDM(nn.Module):
     def forward(self, y, x, seed=None):
         '''
         Run forward_prediction method to get t, eps, y_t, and an estimate of the target.
-        Compute estimated eps from estimated target.
-        Returns the criterion loss between real and estimated eps.
+        Compute estimated y from estimated target.
+        Returns the loss between real and estimated y.
         '''
         t, eps, y_t, estimated_target = self.forward_prediction(y, x, seed)
-        estimated_eps = self.get_eps_from_target(estimated_target, y_t, t)
-        return self.criterion(eps, estimated_eps)
+        estimated_y = self.get_y_from_target(estimated_target, y_t, t)
+        loss = self.compute_loss(y, estimated_y, t)
+        return loss
+    
+    def compute_loss(self, y, estimated_y, t):
+        loss_per_pixel = nn.MSELoss(reduction='none')(y, estimated_y) # BxCxHxW tensor
+        loss_per_image = torch.mean(loss_per_pixel, dim=(1,2,3)) # B tensor
+        if self.loss_weighting=="uniform":
+            loss = torch.mean(loss_per_image)
+        if self.loss_weighting=="SNR":
+            loss = torch.mean(loss_per_image*self.gamma[t]/(1-self.gamma[t]))
+        #for i in range(y.shape[0]):
+        #    print(f"Image loss : {loss_per_image[i].item()} at time {t[i].item()}. Weight is {self.gamma[t[i]]/(1-self.gamma[t[i]])}")
+        return loss
     
     def get_eps_from_target(self, target, y_t, t):
         if self.denoising_target=="eps":
@@ -72,8 +87,8 @@ class cDDM(nn.Module):
 
 
 class cDDPM(cDDM):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, denoising_net, **kwargs):
+        super().__init__(denoising_net, **kwargs)
 
     def sample(self, x, return_trajectory=False, seed=None):
         '''x is a BxCxHxW tensor. Returns a tensor of the same shape.'''
@@ -105,12 +120,41 @@ class cDDPM(cDDM):
             z = torch.randn(x.shape, generator=generator, device=device) if t > 1 else 0
             y_t = self.oneover_sqrta[t] * (y_t - estimated_eps * self.beta_over_sqrt_one_minus_gamma[t]) + self.sqrtbeta[t] * z # sigma is sqrt_beta here
         y_noisy.append(y_t) # y_0 
-        y_estimates.append(y_estimates) # not really useful as it is the same element as the prev one, but to make size consistent with y_noisy
+        y_estimates.append(estimated_y) # not really useful as it is the same element as the prev one, but to make size consistent with y_noisy
 
         if return_trajectory:
             return torch.cat(y_noisy), torch.cat(y_estimates)
         else:
             return y_t
+        
+class TADM(cDDPM):
+    def __init__(self, denoising_net, task_net, **kwargs):
+        super().__init__(denoising_net, **kwargs)
+        self.task_net = task_net
+
+    def forward(self, y, x, task_target, seed=None):
+        '''
+        Run forward_prediction method to get t, eps, y_t, and an estimate of the target.
+        Returns both denoising loss and task loss
+        '''
+        t, eps, y_t, estimated_target = self.forward_prediction(y, x, seed)
+        estimated_y = self.get_y_from_target(estimated_target, y_t, t)
+        denoising_loss = self.compute_loss(y, estimated_y, t)
+
+        # Task network was trained on (0.5,0.5)-normalized images. Hardcoding this here until better solution
+        coeffs_sted = (0.0850, 0.1107)
+        estimated_y = estimated_y*coeffs_sted[1] + coeffs_sted[0]
+        estimated_y = (estimated_y - 0.5) / 0.5
+        task_target = (task_target - 0.5) / 0.5
+        estimated_task_target = self.task_net(estimated_y)
+
+        task_loss = self.compute_task_loss(task_target, estimated_task_target)
+
+        return denoising_loss, task_loss
+    
+    def compute_task_loss(self, task_target, estimated_task_target):
+        # might need some weighting
+        return nn.MSELoss()(task_target, estimated_task_target)
 
 # OUTDATED CODE. DDIM sampling and DDPM sampling for SR3 (gamma instead of t, and inverts y and x for the unet)
 

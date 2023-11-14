@@ -5,13 +5,12 @@ from torch.utils.data import DataLoader
 
 from torchvision.utils import save_image, make_grid
 
-from models.unet import Unet
+from importlib import import_module
 from models.cddm import cDDPM
 
 import os
 
-from datasets.axons_dataset import AxonsDataset
-from datasets.dendrites_dataset import DendritesDataset
+import datasets
 from misc.options import parse_options
 from misc.utils import *
 from misc.logger import Logger
@@ -22,24 +21,25 @@ def train(opt):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # Create training Dataset and DataLoader
-    train_dataset = globals()[opt.dataset_name](root="./data", phase="train")
+    Dataset = getattr(datasets, opt.dataset_name)
+    train_dataset = Dataset(root="./data", phase="train", match_means=False)
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True)
     # Create validation Dataset and Dataloader
-    valid_dataset = globals()[opt.dataset_name](root="./data", phase="valid")
+    valid_dataset = Dataset(root="./data", phase="valid", match_means=False)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     # Get test image
     test = valid_dataset[228]
     test_confocal = test["confocal"].unsqueeze(0).to(device) # unsqueeze needed for batch dimension
     test_STED = test["STED"].unsqueeze(0).to(device)
 
-    img_shape = train_dataset[0]["STED"].shape
-
-    # Initialize model
-    model = cDDPM(denoising_net=Unet(img_shape[0]*2, img_shape[0], n_feat=128), denoising_target='y')
-    # Load model from checkpoint
+    # Initialize/load denoising network
+    Unet = getattr(import_module(f"models.denoising.{opt.denoising_net_name}"), "Unet")
+    denoising_net = Unet(in_channels=2, out_channels=1)
     if opt.load_checkpoint is not None:
         loaded_checkpoint_dir = os.path.join("./checkpoints", opt.load_checkpoint)
-        model.denoising_net.load_state_dict(torch.load(os.path.join(loaded_checkpoint_dir, f"denoising_net_{opt.load_epoch}.pth")))
+        denoising_net.load_state_dict(torch.load(os.path.join(loaded_checkpoint_dir, f"denoising_net_{opt.load_epoch}.pth")))
+
+    model = cDDPM(denoising_net, denoising_target=opt.denoising_target)
     model.to(device)
 
     optim = torch.optim.Adam(model.parameters(), lr=opt.learning_rate)
