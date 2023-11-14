@@ -158,11 +158,11 @@ class ResnetBlocWithAttn(nn.Module):
         return x
 
 
-class UNet(nn.Module):
+class Unet(nn.Module):
     def __init__(
         self,
-        in_channel=2,
-        out_channel=1,
+        in_channels=2,
+        out_channels=1,
         inner_channel=32,
         norm_groups=32,
         channel_mults=(1, 2, 4, 8, 8),
@@ -190,7 +190,7 @@ class UNet(nn.Module):
         pre_channel = inner_channel
         feat_channels = [pre_channel]
         now_res = image_size
-        downs = [nn.Conv2d(in_channel, inner_channel,
+        downs = [nn.Conv2d(in_channels, inner_channel,
                            kernel_size=3, padding=1)]
         for ind in range(num_mults):
             is_last = (ind == num_mults - 1)
@@ -230,7 +230,7 @@ class UNet(nn.Module):
 
         self.ups = nn.ModuleList(ups)
 
-        self.final_conv = Block(pre_channel, default(out_channel, in_channel), groups=norm_groups)
+        self.final_conv = Block(pre_channel, default(out_channels, in_channels), groups=norm_groups)
 
     def forward(self, x, time):
         t = self.noise_level_mlp(time) if exists(

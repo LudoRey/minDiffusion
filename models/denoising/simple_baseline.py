@@ -1,3 +1,5 @@
+'''Modified from https://github.com/TeaPearce/Conditional_Diffusion_MNIST. Removed the context c'''
+
 import torch
 import torch.nn as nn
 
@@ -90,7 +92,7 @@ class EmbedFC(nn.Module):
 
 
 class Unet(nn.Module):
-    def __init__(self, in_channels, out_channels, n_feat = 256):
+    def __init__(self, in_channels, out_channels, n_feat = 128):
         super().__init__()
 
         self.in_channels = in_channels
