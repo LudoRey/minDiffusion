@@ -22,10 +22,10 @@ def train(opt):
     
     # Create training Dataset and DataLoader
     Dataset = getattr(datasets, opt.dataset_name)
-    train_dataset = Dataset(root="./data", phase="train", match_means=False)
+    train_dataset = Dataset(root="./data", phase="train")
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True)
     # Create validation Dataset and Dataloader
-    valid_dataset = Dataset(root="./data", phase="valid", match_means=False)
+    valid_dataset = Dataset(root="./data", phase="valid")
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     # Get test image
     test = valid_dataset[228]
