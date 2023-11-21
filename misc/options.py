@@ -11,8 +11,9 @@ def parse_options():
     parser.add_argument("--patience", type=int, default=None, help="Patience parameter for ReduceLROnPlateau. None means no scheduler.")
     # Options related to TA-DM specifically
     parser.add_argument("--denoising_net_name", type=str, default="simple_baseline", help="Either 'simple_baseline' or 'sr3'.")
-    parser.add_argument("--denoising_target", type=str, default="y", help="Either 'y' or 'eps'.")
-    parser.add_argument("--lambda_TA", type=float, default=1, help="Weight used for the task loss")
+    parser.add_argument("--denoising_target", type=str, default="both", help="Either 'y', 'eps' or 'both.")
+    parser.add_argument("--loss_weighting", type=str, default="maxSNR-1")
+    parser.add_argument("--task_weight", type=float, default=1, help="Weight used for the task loss")
     # Options related to loading and saving checkpoints (as well as saving other stuff)
     parser.add_argument("--load_checkpoint", type=str, default=None, help="The checkpoint folder to be loaded.")
     parser.add_argument("--load_epoch", type=int, default=0, help="The model ./checkpoint/<load_checkpoint>/net_<load_epoch>.pth will be loaded.")
