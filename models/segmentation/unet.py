@@ -78,7 +78,7 @@ class Expander(nn.Module):
         return x
 
 
-class UNet(nn.Module):
+class Unet(nn.Module):
     """
     Class for creating the UNet architecture. A first double convolution is performed
     on the input tensor then the contracting path is created with a given depth and
@@ -91,7 +91,7 @@ class UNet(nn.Module):
     :param size: The size of the crops that are fed to the network
     """
     def __init__(self, in_channels, out_channels, number_filter=4, depth=4, size=128):
-        super(UNet, self).__init__()
+        super(Unet, self).__init__()
         self.size = size
         self.out_channels = out_channels
 
