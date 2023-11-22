@@ -59,8 +59,8 @@ def train(opt):
             total_loss.backward()
             optim.step()
             # Keep track of losses
-            train_denoising_loss += denoising_loss.item()*len(batch)
-            train_task_loss += task_loss.item()*len(batch)
+            train_denoising_loss += denoising_loss.item()*len(y)
+            train_task_loss += task_loss.item()*len(y)
         train_denoising_loss /= len(train_dataset)
         train_task_loss /= len(train_dataset)
         print(f'Denoising loss : {train_denoising_loss}, Task loss : {train_task_loss}')
@@ -78,8 +78,8 @@ def train(opt):
                 # Update seed
                 seed += 1
                 # Keep track of losses
-                valid_denoising_loss += denoising_loss.item()*len(batch)
-                valid_task_loss += task_loss.item()*len(batch)
+                valid_denoising_loss += denoising_loss.item()*len(y)
+                valid_task_loss += task_loss.item()*len(y)
         valid_denoising_loss /= len(valid_dataset)
         valid_task_loss /= len(valid_dataset)
         print(f'Denoising loss : {valid_denoising_loss}, Task loss : {valid_task_loss}')
