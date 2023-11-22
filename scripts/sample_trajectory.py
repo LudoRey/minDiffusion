@@ -27,10 +27,9 @@ def sample_trajectory(opt):
         y_t, estimated_y = model.sample(x, return_trajectory=True, seed=42)
 
     # Select subset of timesteps
-    n = 9
+    n = 5
     t = get_linspace_timesteps(n, model.T)
-    x = x.repeat(n,1,1,1)
-    y = y.repeat(n,1,1,1)
+    x = x.repeat(n+1,1,1,1)
     y_t = y_t[t]
     estimated_y = estimated_y[t]
 
@@ -48,11 +47,11 @@ def sample_trajectory(opt):
         y_task = model.task_net(y/factor)
 
     # Make grid
-    images = torch.cat((x, y_t, estimated_y, y)).cpu()
+    images = torch.cat((x, y_t, y, estimated_y, y)).cpu()
     images = apply_colormap(images, vmin=0, vmax=1)
     seg = torch.cat((estimated_y_task, y_task)).cpu()
     seg = combine_purple_green(seg[:,1:2], seg[:,0:1])
-    grid = make_grid(torch.cat((images, seg)), nrow=n)
+    grid = make_grid(torch.cat((images, seg)), nrow=n+1)
 
     save_dir = f"samples/{opt.load_checkpoint}_{opt.load_epoch}"
     if not os.path.exists(save_dir):
