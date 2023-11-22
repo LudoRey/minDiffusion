@@ -104,7 +104,7 @@ class cDM(nn.Module):
             y = (1-self.gamma[t,None,None,None])*y_explicit + self.gamma[t,None,None,None]*y_implicit
         return y
     
-    def sample(self, x, n_steps=None, sampling_mode='DDPM', return_trajectory=False, seed=None):
+    def sample(self, x, n_steps=None, sampling_mode='DDPM', return_trajectory=False, seed=None, y_T=None):
         '''x is a BxCxHxW tensor. By default, returns a tensor of the same shape.
         If return_trajectory=True, returns two tensors of size ((n_steps+1)*B)xCxHxW.'''
         # Get device and B (number of samples) from x
@@ -123,8 +123,9 @@ class cDM(nn.Module):
         # Storing intermediate results in case return_trajectory=True
         list_y_t = [] # list containing all y_t's
         list_estimated_y = [] # list containing all intermediate estimates of y_0
+        # Initialize y_T with pure noise (if not already given by user)
+        y_t = torch.randn(x.shape, generator=generator, device=device) if y_T is None else y_T
         # DDPM sampling
-        y_t = torch.randn(x.shape, generator=generator, device=device) # Initialize y_T with pure noise
         for i in tqdm(reversed(range(n_steps)), total=n_steps, desc="Sampling..."):
             t = timesteps[i]
             # Compute estimates of y and eps
